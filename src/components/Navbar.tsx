@@ -115,7 +115,6 @@ export default function Navbar() {
     };
   }, [pathname, user?.uid]); 
 
-  // ريست لزر الإغلاق لو سجل خروج ودخل بحساب ثاني
   useEffect(() => {
     setDismissBan(false);
   }, [user?.uid]);
@@ -252,18 +251,43 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام الحظر المطور بالأزرار التفاعلية الجديدة */}
+      {/* 🚨 نظام الحظر المطور والمحصن لقراءة كل صيغ الوقت بدقة */}
       {user && (user as any).isBanned && !dismissBan && (() => {
         const banUntil = (user as any).banUntil;
-        let remainingHours: number | null = null;
+        let timeText = isAr ? "حتى إشعار آخر" : "Until further notice";
 
-        if (banUntil && banUntil.seconds) {
-          const banUntilTime = banUntil.seconds * 1000;
-          const currentTime = Date.now();
-          const timeLeftMs = banUntilTime - currentTime;
-          
-          if (timeLeftMs <= 0) return null;
-          remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
+        if (banUntil) {
+          let banUntilTime = 0;
+
+          // 🧠 فك تشفير صيغة الوقت بمرونة كاملة من الفايربيز
+          if (banUntil.seconds) {
+            banUntilTime = banUntil.seconds * 1000;
+          } else if (banUntil instanceof Date) {
+            banUntilTime = banUntil.getTime();
+          } else if (typeof banUntil === "string" || typeof banUntil === "number") {
+            banUntilTime = new Date(banUntil).getTime();
+          }
+
+          if (banUntilTime > 0) {
+            const currentTime = Date.now();
+            const timeLeftMs = banUntilTime - currentTime;
+
+            // إذا انتهت مدة الحظر بالكامل، يفتح الموقع فوراً تلقائياً
+            if (timeLeftMs <= 0) return null;
+
+            const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
+            
+            // 📝 تنسيق النص بشكل احترافي (أيام + ساعات)
+            if (remainingHours > 24) {
+              const days = Math.floor(remainingHours / 24);
+              const hours = remainingHours % 24;
+              timeText = isAr 
+                ? `${days} يوم و ${hours} ساعة` 
+                : `${days} Days and ${hours} Hours`;
+            } else {
+              timeText = isAr ? `${remainingHours} ساعة` : `${remainingHours} Hours`;
+            }
+          }
         }
 
         return (
@@ -276,29 +300,19 @@ export default function Navbar() {
                 <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{(user as any).banReason || (isAr ? "مخالفة بنود الاستخدام" : "Violation of terms")}</span></p>
                 <p className="text-xs text-zinc-400 font-bold">
                   ⏳ {isAr ? "المدة المتبقية:" : "Time Remaining:"}{" "}
-                  <span className="text-amber-400 font-mono font-black">
-                    {remainingHours !== null ? `${remainingHours} ${isAr ? "ساعة" : "Hours"}` : (isAr ? "حتى إشعار آخر" : "Until further notice")}
-                  </span>
+                  <span className="text-amber-400 font-mono font-black">{timeText}</span>
                 </p>
               </div>
               
               <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة المراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
+                {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة Mراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
               </p>
 
-              {/* 🎛️ الأزرار التفاعلية الجديدة */}
               <div className="flex gap-3 pt-2" dir={isAr ? "rtl" : "ltr"}>
-                <button 
-                  onClick={() => setDismissBan(true)} 
-                  className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer text-center"
-                >
+                <button onClick={() => setDismissBan(true)} className="flex-1 bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer text-center">
                   {isAr ? "موافق، تصفح الموقع" : "OK, Browse Site"}
                 </button>
-                <Link 
-                  href={`/${lang}/support`} 
-                  onClick={() => setDismissBan(true)}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl text-xs font-black transition-all text-center block cursor-pointer"
-                >
+                <Link href={`/${lang}/support`} onClick={() => setDismissBan(true)} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl text-xs font-black transition-all text-center block cursor-pointer">
                   {isAr ? "تقديم اعتراض 📝" : "Submit Appeal 📝"}
                 </Link>
               </div>
