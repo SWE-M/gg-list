@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"; 
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation"; // 👈 أضفنا useRouter للتوجيه الذكي
+import { useParams, usePathname, useRouter } from "next/navigation"; 
 import { useAuth } from "@/context/AuthContext"; 
 import { db } from "@/lib/firebase"; 
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, orderBy, limit } from "firebase/firestore";
-import { markNotificationAsRead, markAllNotificationsAsRead, AppNotification } from "@/lib/notifications"; // 👈 استيراد محرك الإشعارات
+import { markNotificationAsRead, markAllNotificationsAsRead, AppNotification } from "@/lib/notifications"; 
 
 export default function Navbar() {
   const params = useParams();
@@ -17,37 +17,39 @@ export default function Navbar() {
   
   // حالات القوائم المنسدلة
   const [dropdownOpen, setDropdownOpen] = useState(false); 
-  const [notificationsOpen, setNotificationsOpen] = useState(false); // 👈 حالة فتح صندوق الإشعارات
+  const [notificationsOpen, setNotificationsOpen] = useState(false); 
   
   // 🔔 حالات الإشعارات والرسائل الحية
-  const [unreadCount, setUnreadCount] = useState(0); // للرسائل
-  const [notifications, setNotifications] = useState<AppNotification[]>([]); // قائمة الإشعارات
-  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0); // عداد الإشعارات الحمراء
+  const [unreadCount, setUnreadCount] = useState(0); 
+  const [notifications, setNotifications] = useState<AppNotification[]>([]); 
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0); 
 
   const { user, loading, loginWithGoogle, logout } = useAuth();
 
-  // 📡 الاستماع لطلبات المراسلة (كودك الأصلي)
+  // 📡 الاستماع لطلبات المراسلة
   useEffect(() => {
-    if (!user) {
+    // 🛡️ استخدام user?.uid فقط في المراقبة يمنع الدوامة إذا تغيرت بيانات أخرى للمستخدم
+    const uid = user?.uid;
+    if (!uid) {
       setUnreadCount(0);
       return;
     }
     const requestsRef = collection(db, "chatRequests");
-    const q = query(requestsRef, where("receiverId", "==", user.uid), where("status", "==", "pending"));
+    const q = query(requestsRef, where("receiverId", "==", uid), where("status", "==", "pending"));
     const unsubscribe = onSnapshot(q, (snapshot) => setUnreadCount(snapshot.size), (e) => console.error(e));
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
-  // 🔔 ميزة الاستماع السحابي لمركز الإشعارات العام (جديد!)
+  // 🔔 ميزة الاستماع السحابي لمركز الإشعارات العام
   useEffect(() => {
-    if (!user) {
+    const uid = user?.uid;
+    if (!uid) {
       setNotifications([]);
       setUnreadNotifsCount(0);
       return;
     }
     const notifRef = collection(db, "notifications");
-    // جلب أحدث 20 إشعار يخص هذا اللاعب
-    const q = query(notifRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
+    const q = query(notifRef, where("userId", "==", uid), orderBy("createdAt", "desc"), limit(20));
 
     const unsubscribeNotifs = onSnapshot(q, (snapshot) => {
       const notifsData: AppNotification[] = [];
@@ -64,17 +66,18 @@ export default function Navbar() {
     });
 
     return () => unsubscribeNotifs();
-  }, [user]);
+  }, [user?.uid]);
 
-  // 🕵️‍♂️ رادار التتبع المحمي والمحدث (Presence System - Optimized)
+  // 🕵️‍♂️ رادار التتبع المحمي (Presence System)
   useEffect(() => {
-    if (!user) return;
+    const uid = user?.uid;
+    if (!uid) return;
 
     let timeoutId: NodeJS.Timeout;
 
     const updatePresence = async (onlineStatus: boolean) => {
       try {
-        const userRef = doc(db, "users", user.uid);
+        const userRef = doc(db, "users", uid);
         await updateDoc(userRef, {
           isOnline: onlineStatus,
           currentPath: onlineStatus ? pathname : "---",
@@ -85,7 +88,7 @@ export default function Navbar() {
       }
     };
 
-    // تأخير التحديث قليلاً (Debounce) لضمان عدم تكرار الضربات البرمجية مع التنقل السريع
+    // تأخير التحديث قليلاً لضمان عدم إرسال طلبات متعددة مع التنقل السريع
     timeoutId = setTimeout(() => {
       if (document.visibilityState === "visible") {
         updatePresence(true);
@@ -106,16 +109,16 @@ export default function Navbar() {
       clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [pathname, user]);
+  }, [pathname, user?.uid]); 
 
   // 🖱️ دالة التعامل مع الضغط على إشعار معين
   const handleNotificationClick = async (notif: AppNotification) => {
     if (!notif.isRead && notif.id) {
-      await markNotificationAsRead(notif.id); // نحدده كمقروء في الداتا بيس
+      await markNotificationAsRead(notif.id); 
     }
-    setNotificationsOpen(false); // نغلق الصندوق
+    setNotificationsOpen(false); 
     if (notif.link) {
-      router.push(notif.link); // نوجهه للرابط المرفق بالإشعار إن وُجد
+      router.push(notif.link); 
     }
   };
 
@@ -129,26 +132,22 @@ export default function Navbar() {
 
         <div className="flex items-center gap-4 sm:gap-6 text-sm font-bold" suppressHydrationWarning>
           <Link href={`/${lang}`} className="text-zinc-400 hover:text-white transition-colors">{isAr ? "الرئيسية" : "Home"}</Link>
-          
           <Link href={`/${lang}/explore`} className="text-zinc-400 hover:text-white transition-colors">{isAr ? "استكشف" : "Explore"}</Link>
-          
           <Link href={`/${lang}/community`} className="text-zinc-400 hover:text-white transition-colors">{isAr ? "المجتمع" : "Community"}</Link>
-          
           <Link href={`/${lang}/support`} className="text-zinc-400 hover:text-white transition-colors">{isAr ? "الدعم الفني" : "Support"}</Link>
+          
           {user && (
             <div className="flex items-center gap-3" suppressHydrationWarning>
-              {/* ✉️ زر الرسائل الخاص بك */}
               <Link href={`/${lang}/messages`} className="text-zinc-400 hover:text-white transition-colors relative flex items-center gap-1">
                 <span>{isAr ? "الرسائل" : "Messages"}</span>
                 {unreadCount > 0 && <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse border border-black shadow-lg">{unreadCount}</span>}
               </Link>
 
-              {/* 🔔 أيقونة الجرس الجديدة */}
               <div className="relative" suppressHydrationWarning>
                 <button 
                   onClick={() => {
                     setNotificationsOpen(!notificationsOpen);
-                    setDropdownOpen(false); // نغلق قائمة البروفايل إذا كانت مفتوحة
+                    setDropdownOpen(false); 
                   }} 
                   className="text-zinc-400 hover:text-white transition-colors relative flex items-center cursor-pointer p-1"
                 >
@@ -156,13 +155,11 @@ export default function Navbar() {
                   {unreadNotifsCount > 0 && <span className="absolute top-0 right-0 bg-purple-500 w-2.5 h-2.5 rounded-full border-2 border-zinc-950 animate-pulse shadow-[0_0_8px_rgba(168,85,247,0.8)]" />}
                 </button>
 
-                {/* 🗂️ صندوق الإشعارات المنسدل العائم */}
                 {notificationsOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
                     <div className={`absolute top-full mt-4 w-[350px] min-w-[350px] bg-zinc-950 border border-zinc-800 rounded-none shadow-2xl shadow-black z-50 overflow-hidden ${isAr ? "left-0 sm:right-0 sm:left-auto" : "right-0"}`} suppressHydrationWarning>
                       
-                      {/* رأس الصندوق */}
                       <div className="p-4 border-b border-zinc-900 bg-zinc-900/40 flex justify-between items-center" suppressHydrationWarning>
                         <span className="text-sm font-black text-white">{isAr ? "الإشعارات 🔔" : "Notifications 🔔"}</span>
                         {unreadNotifsCount > 0 && (
@@ -175,7 +172,6 @@ export default function Navbar() {
                         )}
                       </div>
 
-                      {/* قائمة الإشعارات */}
                       <div className="max-h-[400px] overflow-y-auto scrollbar-thin" suppressHydrationWarning>
                         {notifications.length === 0 ? (
                           <div className="p-8 text-center text-zinc-500 text-xs font-bold space-y-2">
@@ -225,7 +221,6 @@ export default function Navbar() {
             {isAr ? "التصنيف 🎮" : "Tier List"}
           </Link>
 
-          {/* ⚡ متحكم الحساب الذكي */}
           {loading ? (
             <div className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 animate-pulse" suppressHydrationWarning />
           ) : user ? (
@@ -233,7 +228,7 @@ export default function Navbar() {
               <button
                 onClick={() => {
                   setDropdownOpen(!dropdownOpen);
-                  setNotificationsOpen(false); // إغلاق الإشعارات إذا كانت مفتوحة
+                  setNotificationsOpen(false); 
                 }}
                 className="flex items-center gap-2 bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 p-1.5 px-3 rounded-xl transition-all cursor-pointer"
                 suppressHydrationWarning
@@ -252,7 +247,6 @@ export default function Navbar() {
                       <span>{isAr ? "الملف الشخصي" : "Profile"}</span><span>👤</span>
                     </Link>
 
-                    {/* 👑 زر لوحة التحكم الإدارية */}
                     {["ADUh6c2FnScmOewpASpAU6w8llE3"].includes(user.uid) && (
                       <Link href={`/${lang}/admin`} onClick={() => setDropdownOpen(false)} className="w-full flex items-center justify-between px-3 py-2 text-xs font-black text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors cursor-pointer mb-1" dir={isAr ? "rtl" : "ltr"}>
                         <span>{isAr ? "غرفة القيادة" : "Dashboard"}</span><span>🛡️</span>
@@ -274,14 +268,12 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نافذة الحظر المؤقت الذكية للاعب المخالف */}
       {user && (user as any).isBanned && (user as any).banUntil && (
         (() => {
           const banUntilTime = (user as any).banUntil.seconds * 1000;
           const currentTime = Date.now();
           const timeLeftMs = banUntilTime - currentTime;
           
-          // إذا انتهى وقت الحظر تلقائياً، لا تعرض النافذة وسيعود حسابه للعمل فوراً
           if (timeLeftMs <= 0) return null;
 
           const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
