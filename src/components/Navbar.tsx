@@ -19,6 +19,9 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false); 
   const [notificationsOpen, setNotificationsOpen] = useState(false); 
   
+  // 🔓 حالة إغلاق نافذة الحظر مؤقتاً للتصفح
+  const [dismissBan, setDismissBan] = useState(false);
+
   // 🔔 حالات الإشعارات والرسائل الحية
   const [unreadCount, setUnreadCount] = useState(0); 
   const [notifications, setNotifications] = useState<AppNotification[]>([]); 
@@ -26,7 +29,7 @@ export default function Navbar() {
 
   const { user, loading, loginWithGoogle, logout } = useAuth();
 
-  // 📡 Mmessages Listener
+  // 📡 Messages Listener
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) {
@@ -111,6 +114,11 @@ export default function Navbar() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [pathname, user?.uid]); 
+
+  // ريست لزر الإغلاق لو سجل خروج ودخل بحساب ثاني
+  useEffect(() => {
+    setDismissBan(false);
+  }, [user?.uid]);
 
   const handleNotificationClick = async (notif: AppNotification) => {
     if (!notif.isRead && notif.id) {
@@ -244,8 +252,8 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام درع الحظر المطور: شاشة كاملة تغلق الموقع فوراً بمجرد رصد الحظر وبمرونة كاملة للبيانات ناقصة النطاق */}
-      {user && (user as any).isBanned && (() => {
+      {/* 🚨 نظام الحظر المطور بالأزرار التفاعلية الجديدة */}
+      {user && (user as any).isBanned && !dismissBan && (() => {
         const banUntil = (user as any).banUntil;
         let remainingHours: number | null = null;
 
@@ -254,7 +262,6 @@ export default function Navbar() {
           const currentTime = Date.now();
           const timeLeftMs = banUntilTime - currentTime;
           
-          // إذا انتهت مدة الحظر بالكامل، يفتح الموقع تلقائياً
           if (timeLeftMs <= 0) return null;
           remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
         }
@@ -264,6 +271,7 @@ export default function Navbar() {
             <div className="bg-zinc-950 border-2 border-red-900/60 p-8 rounded-3xl max-w-md w-full text-center space-y-5 shadow-2xl shadow-red-900/20" suppressHydrationWarning>
               <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto text-3xl">🔒</div>
               <h2 className="text-xl font-black text-red-500 tracking-tight">{isAr ? "تنبيه: تم تقييد حسابك مؤقتاً!" : "Notice: Temporary Account Restriction!"}</h2>
+              
               <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-900 text-right space-y-2" dir={isAr ? "rtl" : "ltr"} suppressHydrationWarning>
                 <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{(user as any).banReason || (isAr ? "مخالفة بنود الاستخدام" : "Violation of terms")}</span></p>
                 <p className="text-xs text-zinc-400 font-bold">
@@ -273,9 +281,28 @@ export default function Navbar() {
                   </span>
                 </p>
               </div>
+              
               <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
                 {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة المراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
               </p>
+
+              {/* 🎛️ الأزرار التفاعلية الجديدة */}
+              <div className="flex gap-3 pt-2" dir={isAr ? "rtl" : "ltr"}>
+                <button 
+                  onClick={() => setDismissBan(true)} 
+                  className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer text-center"
+                >
+                  {isAr ? "موافق، تصفح الموقع" : "OK, Browse Site"}
+                </button>
+                <Link 
+                  href={`/${lang}/support`} 
+                  onClick={() => setDismissBan(true)}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-2xl text-xs font-black transition-all text-center block cursor-pointer"
+                >
+                  {isAr ? "تقديم اعتراض 📝" : "Submit Appeal 📝"}
+                </Link>
+              </div>
+
               <div className="pt-3 border-t border-zinc-900 text-[9px] font-mono text-zinc-600 tracking-widest">GG LIST SECURITY PROTOCOL</div>
             </div>
           </div>
