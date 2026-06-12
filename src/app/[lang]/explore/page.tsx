@@ -88,7 +88,9 @@ export default function ExplorePage({ params }: ExplorePageProps) {
     }, 400); // إرجاء بمقدار 400 جزء من الثانية لراحة السيرفر وسلاسة الواجهة
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, user]);
+  // 👈 درع العاصفة 1: المراقبة للـ ID فقط
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, user?.uid, (user as any)?.isBanned]);
 
   // 4️⃣ استدعاء دالة جلب الشبكة الرئيسية بناءً على الفلاتر المختارة
   const executeSearch = async (e?: React.FormEvent) => {
@@ -126,8 +128,9 @@ export default function ExplorePage({ params }: ExplorePageProps) {
     if (currentType === "games") {
       executeSearch();
     }
+  // 👈 درع العاصفة 2: المراقبة للـ ID فقط لمنع تكرار البحث بلا توقف
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlatform, selectedGenre, selectedYear, selectedOrdering, currentType, user]);
+  }, [selectedPlatform, selectedGenre, selectedYear, selectedOrdering, currentType, user?.uid, (user as any)?.isBanned]);
 
   // 🗂️ قوائم الفلاتر المدعومة
   const platforms = [
