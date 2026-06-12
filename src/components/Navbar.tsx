@@ -15,14 +15,18 @@ export default function Navbar() {
   const lang = params.lang || "ar";
   const isAr = lang === "ar";
   
+  // حالات القوائم المنسدلة
   const [dropdownOpen, setDropdownOpen] = useState(false); 
   const [notificationsOpen, setNotificationsOpen] = useState(false); 
+  
+  // 🔔 حالات الإشعارات والرسائل الحية
   const [unreadCount, setUnreadCount] = useState(0); 
   const [notifications, setNotifications] = useState<AppNotification[]>([]); 
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0); 
 
   const { user, loading, loginWithGoogle, logout } = useAuth();
 
+  // 📡 Mmessages Listener
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) {
@@ -35,6 +39,7 @@ export default function Navbar() {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  // 🔔 Notifications Listener
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) {
@@ -60,7 +65,7 @@ export default function Navbar() {
     return () => unsubscribeNotifs();
   }, [user?.uid]);
 
-  // 🕵️‍♂️ رادار التتبع المحصن ضد الدوامات اللانهائية!
+  // 🕵️‍♂️ Presence System
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) return;
@@ -69,13 +74,10 @@ export default function Navbar() {
 
     const updatePresence = async (onlineStatus: boolean) => {
       try {
-        // 🛑 درع التيتانيوم: إذا كانت الحالة في الفايربيز مطابقة للحالة الحالية، لا ترسل أي تحديث!
         const isCurrentlyOnline = (user as any)?.isOnline === onlineStatus;
         const isSamePath = (user as any)?.currentPath === (onlineStatus ? pathname : "---");
         
-        if (isCurrentlyOnline && isSamePath) {
-          return; // كسر الدوامة اللانهائية!
-        }
+        if (isCurrentlyOnline && isSamePath) return;
 
         const userRef = doc(db, "users", uid);
         await updateDoc(userRef, {
@@ -108,8 +110,7 @@ export default function Navbar() {
       clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, user?.uid]); // 👈 المراقبة تتم للـ ID والمسار فقط
+  }, [pathname, user?.uid]); 
 
   const handleNotificationClick = async (notif: AppNotification) => {
     if (!notif.isRead && notif.id) {
@@ -243,34 +244,43 @@ export default function Navbar() {
         </div>
       </div>
 
-      {user && (user as any).isBanned && (user as any).banUntil && (
-        (() => {
-          const banUntilTime = (user as any).banUntil.seconds * 1000;
+      {/* 🚨 نظام درع الحظر المطور: شاشة كاملة تغلق الموقع فوراً بمجرد رصد الحظر وبمرونة كاملة للبيانات ناقصة النطاق */}
+      {user && (user as any).isBanned && (() => {
+        const banUntil = (user as any).banUntil;
+        let remainingHours: number | null = null;
+
+        if (banUntil && banUntil.seconds) {
+          const banUntilTime = banUntil.seconds * 1000;
           const currentTime = Date.now();
           const timeLeftMs = banUntilTime - currentTime;
           
+          // إذا انتهت مدة الحظر بالكامل، يفتح الموقع تلقائياً
           if (timeLeftMs <= 0) return null;
+          remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
+        }
 
-          const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
-
-          return (
-            <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[9999] flex items-center justify-center p-4 select-none animate-fadeIn" suppressHydrationWarning>
-              <div className="bg-zinc-950 border-2 border-red-900/60 p-8 rounded-3xl max-w-md w-full text-center space-y-5 shadow-2xl shadow-red-900/20" suppressHydrationWarning>
-                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto text-3xl">🔒</div>
-                <h2 className="text-xl font-black text-red-500 tracking-tight">{isAr ? "تنبيه: تم تقييد حسابك مؤقتاً!" : "Notice: Temporary Account Restriction!"}</h2>
-                <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-900 text-right space-y-2" dir={isAr ? "rtl" : "ltr"} suppressHydrationWarning>
-                  <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{(user as any).banReason || "مخالفة القوانين"}</span></p>
-                  <p className="text-xs text-zinc-400 font-bold">⏳ {isAr ? "المدة المتبقية:" : "Time Remaining:"} <span className="text-amber-400 font-mono font-black">{remainingHours} {isAr ? "ساعة" : "Hours"}</span></p>
-                </div>
-                <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                  {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة المراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
+        return (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[9999] flex items-center justify-center p-4 select-none animate-fadeIn" suppressHydrationWarning>
+            <div className="bg-zinc-950 border-2 border-red-900/60 p-8 rounded-3xl max-w-md w-full text-center space-y-5 shadow-2xl shadow-red-900/20" suppressHydrationWarning>
+              <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto text-3xl">🔒</div>
+              <h2 className="text-xl font-black text-red-500 tracking-tight">{isAr ? "تنبيه: تم تقييد حسابك مؤقتاً!" : "Notice: Temporary Account Restriction!"}</h2>
+              <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-900 text-right space-y-2" dir={isAr ? "rtl" : "ltr"} suppressHydrationWarning>
+                <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{(user as any).banReason || (isAr ? "مخالفة بنود الاستخدام" : "Violation of terms")}</span></p>
+                <p className="text-xs text-zinc-400 font-bold">
+                  ⏳ {isAr ? "المدة المتبقية:" : "Time Remaining:"}{" "}
+                  <span className="text-amber-400 font-mono font-black">
+                    {remainingHours !== null ? `${remainingHours} ${isAr ? "ساعة" : "Hours"}` : (isAr ? "حتى إشعار آخر" : "Until further notice")}
+                  </span>
                 </p>
-                <div className="pt-3 border-t border-zinc-900 text-[9px] font-mono text-zinc-600 tracking-widest">GG LIST SECURITY PROTOCOL</div>
               </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
+                {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة المراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
+              </p>
+              <div className="pt-3 border-t border-zinc-900 text-[9px] font-mono text-zinc-600 tracking-widest">GG LIST SECURITY PROTOCOL</div>
             </div>
-          );
-        })()
-      )}
+          </div>
+        );
+      })()}
     </nav>
   );
 }
