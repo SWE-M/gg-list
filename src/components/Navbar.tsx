@@ -113,6 +113,7 @@ export default function Navbar() {
       clearTimeout(timeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, user?.uid]); 
 
   useEffect(() => {
@@ -259,7 +260,6 @@ export default function Navbar() {
         if (banUntil) {
           let banUntilTime = 0;
 
-          // 🧠 فك تشفير صيغة الوقت بمرونة كاملة من الفايربيز
           if (banUntil.seconds) {
             banUntilTime = banUntil.seconds * 1000;
           } else if (banUntil instanceof Date) {
@@ -272,12 +272,10 @@ export default function Navbar() {
             const currentTime = Date.now();
             const timeLeftMs = banUntilTime - currentTime;
 
-            // إذا انتهت مدة الحظر بالكامل، يفتح الموقع فوراً تلقائياً
             if (timeLeftMs <= 0) return null;
 
             const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
             
-            // 📝 تنسيق النص بشكل احترافي (أيام + ساعات)
             if (remainingHours > 24) {
               const days = Math.floor(remainingHours / 24);
               const hours = remainingHours % 24;
@@ -305,7 +303,7 @@ export default function Navbar() {
               </div>
               
               <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة Mراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
+                {isAr ? "تم تحويل حسابك تلقائياً إلى وضع القراءة فقط. يمكنك تصفح الألعاب وقراءة المراجعات، لكن تم تعطيل قدرتك على التقييم، المشاركة في غرف الدردشة والقروبات، أو تعديل الحساب حتى انتهاء المدة المذكورة." : "Your account is in read-only mode..."}
               </p>
 
               <div className="flex gap-3 pt-2" dir={isAr ? "rtl" : "ltr"}>
