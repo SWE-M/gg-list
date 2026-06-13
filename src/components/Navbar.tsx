@@ -22,7 +22,22 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]); 
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0); 
 
+  // 🎯 الحالة الجديدة: خط مباشر وحي مع الفايربيز بدون كاش المتصفح
+  const [liveUserData, setLiveUserData] = useState<any>(null);
+
   const { user, loading, loginWithGoogle, logout } = useAuth();
+
+  // 📡 جلب بيانات اللاعب المحظور بشكل "حي ومباشر" من قاعدة البيانات
+  useEffect(() => {
+    if (!user?.uid) return;
+    const userRef = doc(db, "users", user.uid);
+    const unsub = onSnapshot(userRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setLiveUserData(snapshot.data());
+      }
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   useEffect(() => {
     const uid = user?.uid;
@@ -244,10 +259,9 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام الحظر: يطبع النص اللي تكتبه بيدك زي ما هو! */}
-      {user && (user as any).isBanned && !dismissBan && (() => {
-        const rawUser = user as any;
-        const banUntil = rawUser.banUntil;
+      {/* 🚨 نظام الحظر المحصن: يقرأ من الداتا بيز الحية (liveUserData) مباشرة مو من الكاش! */}
+      {liveUserData && liveUserData.isBanned && !dismissBan && (() => {
+        const banUntil = liveUserData.banUntil;
         let timeText = isAr ? "حتى إشعار آخر" : "Until further notice";
 
         if (banUntil !== undefined && banUntil !== null && banUntil !== "") {
@@ -261,7 +275,7 @@ export default function Navbar() {
               <h2 className="text-xl font-black text-red-500 tracking-tight">{isAr ? "تنبيه: تم تقييد حسابك مؤقتاً!" : "Notice: Temporary Account Restriction!"}</h2>
               
               <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-900 text-right space-y-2" dir={isAr ? "rtl" : "ltr"} suppressHydrationWarning>
-                <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{(user as any).banReason || (isAr ? "مخالفة بنود الاستخدام" : "Violation of terms")}</span></p>
+                <p className="text-xs text-zinc-400 font-bold">品 {isAr ? "سبب التقييد:" : "Reason:"} <span className="text-white font-black">{liveUserData.banReason || (isAr ? "مخالفة بنود الاستخدام" : "Violation of terms")}</span></p>
                 <p className="text-xs text-zinc-400 font-bold">
                   ⏳ {isAr ? "المدة المتبقية:" : "Time Remaining:"}{" "}
                   <span className="text-amber-400 font-mono font-black">{timeText}</span>
