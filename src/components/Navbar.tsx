@@ -252,21 +252,18 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام الحظر المطور: يطبع النص اللي تكتبه أنت بالملي بدون أي حسابات */}
+      {/* 🚨 نظام الحظر المباشر (المراية): يطبع اللي تكتبه بالحرف بدون تفكير */}
       {user && (user as any).isBanned && !dismissBan && (() => {
         const banUntil = (user as any).banUntil;
         let timeText = isAr ? "حتى إشعار آخر" : "Until further notice";
 
+        // إذا كنت كاتب أي شيء في الحقل، بنطبعه كـ نص صريح ومباشر
         if (banUntil !== undefined && banUntil !== null && banUntil !== "") {
           if (typeof banUntil === "object" && banUntil.seconds) {
-            // دعم قديم لتواريخ الفايربيز لو استخدمتها مستقبلاً
-            const banUntilTime = banUntil.seconds * 1000;
-            const timeLeftMs = banUntilTime - Date.now();
-            if (timeLeftMs <= 0) return null;
-            const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
-            timeText = isAr ? `${remainingHours} ساعة` : `${remainingHours} Hours`;
+            // تجاهل هذا السطر، هذا بس حماية لو الفايربيز أرسل كائن بالغلط
+            timeText = isAr ? "حظر مؤقت" : "Temporary Ban";
           } else {
-            // 🎯 السر هنا: يحول أي رقم أو كلمة تكتبها إلى نص ويعرضها زي ما هي بالضبط!
+            // 🎯 هنا الهدف: أي شيء تكتبه (رقم، كلمة، نص طويل) ينطبع هنا!
             timeText = String(banUntil);
           }
         }
