@@ -252,47 +252,22 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام الحظر المطور والمحصن لقراءة كل صيغ الوقت والنصوص المدخلة بدقة */}
+      {/* 🚨 نظام الحظر المطور: يطبع النص اللي تكتبه أنت بالملي بدون أي حسابات */}
       {user && (user as any).isBanned && !dismissBan && (() => {
         const banUntil = (user as any).banUntil;
         let timeText = isAr ? "حتى إشعار آخر" : "Until further notice";
 
-        if (banUntil) {
-          let banUntilTime = 0;
-
-          if (banUntil.seconds) {
-            banUntilTime = banUntil.seconds * 1000;
-          } else if (banUntil instanceof Date) {
-            banUntilTime = banUntil.getTime();
-          } else if (typeof banUntil === "number") {
-            banUntilTime = banUntil;
-          } else if (typeof banUntil === "string") {
-            const parsed = new Date(banUntil).getTime();
-            if (!isNaN(parsed)) {
-              banUntilTime = parsed;
-            } else {
-              // السر هنا 🎯: لو النص المكتوب مو تاريخ رقمي (مثل: ساعتين، يومين، أسبوع)، اطبعه زي ما هو!
-              timeText = banUntil;
-            }
-          }
-
-          if (banUntilTime > 0) {
-            const currentTime = Date.now();
-            const timeLeftMs = banUntilTime - currentTime;
-
+        if (banUntil !== undefined && banUntil !== null && banUntil !== "") {
+          if (typeof banUntil === "object" && banUntil.seconds) {
+            // دعم قديم لتواريخ الفايربيز لو استخدمتها مستقبلاً
+            const banUntilTime = banUntil.seconds * 1000;
+            const timeLeftMs = banUntilTime - Date.now();
             if (timeLeftMs <= 0) return null;
-
             const remainingHours = Math.ceil(timeLeftMs / (1000 * 60 * 60));
-            
-            if (remainingHours > 24) {
-              const days = Math.floor(remainingHours / 24);
-              const hours = remainingHours % 24;
-              timeText = isAr 
-                ? `${days} يوم و ${hours} ساعة` 
-                : `${days} Days and ${hours} Hours`;
-            } else {
-              timeText = isAr ? `${remainingHours} ساعة` : `${remainingHours} Hours`;
-            }
+            timeText = isAr ? `${remainingHours} ساعة` : `${remainingHours} Hours`;
+          } else {
+            // 🎯 السر هنا: يحول أي رقم أو كلمة تكتبها إلى نص ويعرضها زي ما هي بالضبط!
+            timeText = String(banUntil);
           }
         }
 
