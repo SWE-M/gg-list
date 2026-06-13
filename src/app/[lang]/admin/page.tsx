@@ -3,18 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
-// 🔥 استيراد المحرك الإداري الشامل
+// 🔥 استيراد المحرك الإداري الشامل الذي برمجناه
 import { toggleUserBan, getAllSystemChats, getRecentSystemReviews, deleteOffensiveContent } from "@/lib/admin";
 
 interface AdminPageProps {
   params: Promise<{ lang: string; }>;
 }
 
-// 🔒 الـ ID الخاص بك كمدير عام
 const ADMIN_UIDS = ["ADUh6c2FnScmOewpASpAU6w8llE3"]; 
 
 export default function SuperAdminDashboard({ params }: AdminPageProps) {
@@ -22,17 +21,14 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
   const [isAr, setIsAr] = useState(true);
   const [currentLang, setCurrentLang] = useState("ar");
 
-  // 🗂️ حالة التبويبات النشطة
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "moderation" | "chats">("overview");
 
-  // ☁️ حالات البيانات السحابية
   const [users, setUsers] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
   const [ticketsCount, setTicketsCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // 🔄 حالات التحميل للعمليات (حظر، حذف)
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,7 +44,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
       return;
     }
 
-    // 📡 جلب كل اللاعبين بشكل آمن ومباشر
     const fetchAllUsers = async () => {
       try {
         const usersRef = collection(db, "users");
@@ -66,12 +61,9 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
     };
 
     fetchAllUsers();
-
-    // 🎫 جلب إحصائيات عامة
     getDocs(collection(db, "tickets")).then(snap => setTicketsCount(snap.size)).catch(()=>{});
   }, [user, authLoading]);
 
-  // جلب بيانات المراقبة
   useEffect(() => {
     if (activeTab === "moderation" && reviews.length === 0) {
       getRecentSystemReviews().then(data => setReviews(data));
@@ -81,19 +73,17 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
   }, [activeTab]);
 
 
-  // 🛑 دالة الحظر المباشرة (صارت مراية للنص اللي تكتبه)
+  // 🛑 دالة الحظر المحدثة (ترسل النص والسبب مباشرة)
   const handleBanUser = async (userId: string, currentBanStatus: boolean) => {
     const nextBanStatus = !currentBanStatus;
     
     if (nextBanStatus) {
-      // 1. طلب السبب
       const reason = prompt(
         isAr ? "اكتب سبب حظر هذا اللاعب:" : "Enter the reason for banning this user:",
         isAr ? "مخالفة بنود الاستخدام" : "Violation of terms"
       );
       if (reason === null) return; 
 
-      // 2. طلب المدة (كنص حر تماماً)
       const durationText = prompt(
         isAr ? "اكتب المدة اللي تبغاها تظهر للاعب بالحرف (مثال: أسبوع، 3 أيام، شهر):" : "Enter exact ban duration text (e.g. 3 days):", 
         isAr ? "حتى إشعار آخر" : "Until further notice"
@@ -102,56 +92,35 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
 
       setProcessingId(userId);
       
-      try {
-        // 🔥 الحفظ الإجباري والمباشر في الفايربيز عشان نضمن إن النص ينحفظ زي ما هو 100%
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-          isBanned: true,
-          banReason: reason,
-          banUntil: durationText // هنا ينزرع النص اللي كتبته بيدك!
-        });
-
-        // استدعاء دالة الخادم كإجراء روتيني (لو كان فيها عمليات ثانية)
-        // @ts-ignore
-        toggleUserBan(userId, true, 24, reason).catch(()=>{});
-
-        // تحديث الواجهة فوراً
+      // 🎯 إرسال النص الحرفي والسبب إلى الـ Backend
+      const res = await toggleUserBan(userId, true, durationText, reason);
+      
+      if(res.success) {
         setUsers(prevUsers => 
           prevUsers.map(u => 
             u.id === userId ? { ...u, isBanned: true, banReason: reason, banUntil: durationText } : u
           )
         );
-      } catch (error) {
+      } else {
         alert(isAr ? "حدث خطأ أثناء تنفيذ الحظر." : "An error occurred.");
       }
     } else {
-      // فك الحظر
       if(!confirm(isAr ? "هل أنت متأكد من فك الحظر عن هذا اللاعب؟" : "Are you sure you want to unban this user?")) return;
       setProcessingId(userId);
-      
-      try {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-          isBanned: false,
-          banReason: null,
-          banUntil: null
-        });
-
-        toggleUserBan(userId, false).catch(()=>{});
-
+      const res = await toggleUserBan(userId, false);
+      if(res.success) {
         setUsers(prevUsers => 
           prevUsers.map(u => 
             u.id === userId ? { ...u, isBanned: false, banReason: null, banUntil: null } : u
           )
         );
-      } catch (error) {
+      } else {
         alert(isAr ? "حدث خطأ أثناء فك الحظر." : "An error occurred.");
       }
     }
     setProcessingId(null);
   };
 
-  // 🗑️ دالة حذف محتوى مسيء (مراجعات)
   const handleDeleteReview = async (reviewId: string) => {
     if(!confirm(isAr ? "هل أنت متأكد من حذف هذا المحتوى نهائياً كمدير؟" : "Delete this content permanently?")) return;
     setProcessingId(reviewId);
@@ -194,7 +163,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
     <main className="min-h-screen bg-black text-white py-12 px-4 md:px-8 select-none" dir={isAr ? "rtl" : "ltr"}>
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* 👑 الهيدر الفخم */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-900 pb-6">
           <div className="space-y-1">
             <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-red-500 to-purple-600">
@@ -215,7 +183,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
           </button>
         </div>
 
-        {/* 🎛️ شريط التبويبات (Tabs) */}
         <div className="flex bg-zinc-950/80 border border-zinc-900 p-1.5 rounded-2xl w-fit overflow-x-auto scrollbar-hide relative z-40">
           {[
             { id: "overview", label: isAr ? "نظرة عامة ورادار 🛰️" : "Radar Overview" },
@@ -235,11 +202,9 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
           ))}
         </div>
 
-        {/* ----------------- محتوى التبويبات ----------------- */}
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             
-            {/* 🛰️ 1. تبويب النظرة العامة والرادار */}
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -305,7 +270,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
               </div>
             )}
 
-            {/* 👥 2. تبويب إدارة المستخدمين (الحظر) */}
             {activeTab === "users" && (
               <div className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden shadow-2xl p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -339,7 +303,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
               </div>
             )}
 
-            {/* 🛡️ 3. تبويب المراقبة (حذف التقييمات) */}
             {activeTab === "moderation" && (
               <div className="space-y-4">
                 <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex items-center gap-3 text-amber-400">
@@ -382,7 +345,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
               </div>
             )}
 
-            {/* 💬 4. تبويب الغرف والنظام */}
             {activeTab === "chats" && (
               <div className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden shadow-2xl p-6 text-center space-y-4">
                 <span className="text-6xl">📡</span>

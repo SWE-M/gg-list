@@ -1,11 +1,22 @@
 import { db } from "./firebase";
 import { collection, getDocs, doc, updateDoc, query, orderBy, limit, deleteDoc } from "firebase/firestore";
 
-// 1. 🚫 حظر أو فك حظر مستخدم
-export async function toggleUserBan(userId: string, isBanned: boolean) {
+// 1. 🚫 حظر أو فك حظر مستخدم (محدث ليدعم النص الحر للوقت والسبب)
+export async function toggleUserBan(userId: string, isBanned: boolean, banUntilText: string | null = null, banReasonText: string | null = null) {
   try {
     const userRef = doc(db, "users", userId);
-    await updateDoc(userRef, { isBanned });
+    const updateData: any = { isBanned };
+
+    if (isBanned) {
+        updateData.banUntil = banUntilText || "حتى إشعار آخر";
+        updateData.banReason = banReasonText || "مخالفة بنود الاستخدام";
+    } else {
+        // تنظيف البيانات عند فك الحظر
+        updateData.banUntil = null;
+        updateData.banReason = null;
+    }
+
+    await updateDoc(userRef, updateData);
     return { success: true };
   } catch (error) {
     console.error("Ban error", error);
