@@ -252,7 +252,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* 🚨 نظام الحظر المطور والمحصن لقراءة كل صيغ الوقت بدقة */}
+      {/* 🚨 نظام الحظر المطور والمحصن لقراءة كل صيغ الوقت والنصوص المدخلة بدقة */}
       {user && (user as any).isBanned && !dismissBan && (() => {
         const banUntil = (user as any).banUntil;
         let timeText = isAr ? "حتى إشعار آخر" : "Until further notice";
@@ -264,8 +264,16 @@ export default function Navbar() {
             banUntilTime = banUntil.seconds * 1000;
           } else if (banUntil instanceof Date) {
             banUntilTime = banUntil.getTime();
-          } else if (typeof banUntil === "string" || typeof banUntil === "number") {
-            banUntilTime = new Date(banUntil).getTime();
+          } else if (typeof banUntil === "number") {
+            banUntilTime = banUntil;
+          } else if (typeof banUntil === "string") {
+            const parsed = new Date(banUntil).getTime();
+            if (!isNaN(parsed)) {
+              banUntilTime = parsed;
+            } else {
+              // السر هنا 🎯: لو النص المكتوب مو تاريخ رقمي (مثل: ساعتين، يومين، أسبوع)، اطبعه زي ما هو!
+              timeText = banUntil;
+            }
           }
 
           if (banUntilTime > 0) {
