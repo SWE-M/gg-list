@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, doc, updateDoc } from "firebase/firestore";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
-// 🔥 استيراد المحرك الإداري الشامل الذي برمجناه
+// 🔥 استيراد المحرك الإداري الشامل
 import { toggleUserBan, getAllSystemChats, getRecentSystemReviews, deleteOffensiveContent } from "@/lib/admin";
 
 interface AdminPageProps {
@@ -52,7 +52,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
     const fetchAllUsers = async () => {
       try {
         const usersRef = collection(db, "users");
-        // نستخدم getDocs لضمان تجاوز قيود الاستماع الحية للـ Collection كاملة
         const snapshot = await getDocs(usersRef);
         const usersData: any[] = [];
         snapshot.forEach(doc => {
@@ -72,7 +71,7 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
     getDocs(collection(db, "tickets")).then(snap => setTicketsCount(snap.size)).catch(()=>{});
   }, [user, authLoading]);
 
-  // جلب بيانات المراقبة (Moderation & Chats) عند تغيير التبويب
+  // جلب بيانات المراقبة
   useEffect(() => {
     if (activeTab === "moderation" && reviews.length === 0) {
       getRecentSystemReviews().then(data => setReviews(data));
@@ -82,55 +81,70 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
   }, [activeTab]);
 
 
-  // 🛑 دالة الحظر المطور المؤقت مع تحديد الساعات والسبب وتحديث فوري للواجهة
+  // 🛑 دالة الحظر المباشرة (صارت مراية للنص اللي تكتبه)
   const handleBanUser = async (userId: string, currentBanStatus: boolean) => {
     const nextBanStatus = !currentBanStatus;
     
     if (nextBanStatus) {
-      // 1. طلب السبب من الإدارة العليا
+      // 1. طلب السبب
       const reason = prompt(
         isAr ? "اكتب سبب حظر هذا اللاعب:" : "Enter the reason for banning this user:",
-        isAr ? "سلوك غير لائق في المجتمع" : "Inappropriate behavior"
+        isAr ? "مخالفة بنود الاستخدام" : "Violation of terms"
       );
-      if (reason === null) return; // إلغاء العملية إذا تراجع الأدمن
+      if (reason === null) return; 
 
-      // 2. طلب عدد ساعات تقييد الحساب
-      const hoursString = prompt(
-        isAr ? "حدد مدة الحظر بالساعات (مثال: 24 لـ يوم كامل):" : "Enter ban duration in hours (e.g., 24):", 
-        "24"
+      // 2. طلب المدة (كنص حر تماماً)
+      const durationText = prompt(
+        isAr ? "اكتب المدة اللي تبغاها تظهر للاعب بالحرف (مثال: أسبوع، 3 أيام، شهر):" : "Enter exact ban duration text (e.g. 3 days):", 
+        isAr ? "حتى إشعار آخر" : "Until further notice"
       );
-      if (hoursString === null) return;
-      const hours = parseInt(hoursString) || 24;
+      if (durationText === null) return;
 
       setProcessingId(userId);
-      // @ts-ignore
-      const res = await toggleUserBan(userId, true, hours, reason);
       
-      if(res.success) {
-        // حساب وقت انتهاء الحظر تقديرياً لتحديث الحالة المحلية فوراً
-        const localBanUntil = new Date();
-        localBanUntil.setHours(localBanUntil.getHours() + hours);
+      try {
+        // 🔥 الحفظ الإجباري والمباشر في الفايربيز عشان نضمن إن النص ينحفظ زي ما هو 100%
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, {
+          isBanned: true,
+          banReason: reason,
+          banUntil: durationText // هنا ينزرع النص اللي كتبته بيدك!
+        });
 
+        // استدعاء دالة الخادم كإجراء روتيني (لو كان فيها عمليات ثانية)
+        // @ts-ignore
+        toggleUserBan(userId, true, 24, reason).catch(()=>{});
+
+        // تحديث الواجهة فوراً
         setUsers(prevUsers => 
           prevUsers.map(u => 
-            u.id === userId ? { ...u, isBanned: true, banReason: reason, banUntil: { seconds: Math.floor(localBanUntil.getTime() / 1000) } } : u
+            u.id === userId ? { ...u, isBanned: true, banReason: reason, banUntil: durationText } : u
           )
         );
-      } else {
+      } catch (error) {
         alert(isAr ? "حدث خطأ أثناء تنفيذ الحظر." : "An error occurred.");
       }
     } else {
-      // فك الحظر يدوياً عن الحساب
+      // فك الحظر
       if(!confirm(isAr ? "هل أنت متأكد من فك الحظر عن هذا اللاعب؟" : "Are you sure you want to unban this user?")) return;
       setProcessingId(userId);
-      const res = await toggleUserBan(userId, false);
-      if(res.success) {
+      
+      try {
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, {
+          isBanned: false,
+          banReason: null,
+          banUntil: null
+        });
+
+        toggleUserBan(userId, false).catch(()=>{});
+
         setUsers(prevUsers => 
           prevUsers.map(u => 
             u.id === userId ? { ...u, isBanned: false, banReason: null, banUntil: null } : u
           )
         );
-      } else {
+      } catch (error) {
         alert(isAr ? "حدث خطأ أثناء فك الحظر." : "An error occurred.");
       }
     }
@@ -189,7 +203,6 @@ export default function SuperAdminDashboard({ params }: AdminPageProps) {
             <p className="text-xs text-zinc-400 font-medium">مراقبة حية، إدارة الحسابات، صلاحيات الحذف والحظر.</p>
           </div>
 
-          {/* 👈 تم تأمين الزر هنا كـ button مع طبقة عليا مطلقة تمنع أي تداخل برمجياً وعزل الأحداث لتفادي الجمود */}
           <button 
             type="button"
             onClick={(e) => {
